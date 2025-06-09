@@ -129,11 +129,13 @@ func (iter *BlockChainIterator) Next() *Block {
 	return block
 }
 
+/*
+找出所有還包含(未被該地址花費)Output的交易
+*/
 func (chain *BlockChain) FindUnspentTransactions(address string) []Transaction {
 	var unspentTxs []Transaction
 
-	spentTXOs := make(map[string][]int)
-
+	spentTXOs := make(map[string][]int) // KEY: 交易ID VALUE: 輸出的INDEX (記錄「哪些交易的哪些 output index 已經被花掉」)
 	iter := chain.Iterator()
 
 	for {
@@ -141,6 +143,7 @@ func (chain *BlockChain) FindUnspentTransactions(address string) []Transaction {
 
 		for _, tx := range block.Transactions {
 			txID := hex.EncodeToString(tx.ID)
+			// 遍歷該交易的Outputs 檢查是否花掉
 		Outputs:
 			for outIdx, out := range tx.Outputs {
 				if spentTXOs[txID] != nil {
@@ -189,8 +192,11 @@ func (chain *BlockChain) FindUTXO(address string) []TxOutput {
 	return UTXOs
 }
 
+/*
+從某個地址的UTXO中挑選足夠的輸出，來支付一筆交易
+*/
 func (chain *BlockChain) FindSpendableOutputs(address string, amount int) (int, map[string][]int) {
-	unspentOut := make(map[string][]int)
+	unspentOut := make(map[string][]int) // KEY: 交易ID VALUE: 輸出的INDEX (紀錄哪些輸出被選中來付款)
 	unspentTxs := chain.FindUnspentTransactions(address)
 	accumulated := 0
 
