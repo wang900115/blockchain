@@ -5,6 +5,7 @@ import (
 	"crypto/elliptic"
 	"encoding/gob"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 )
@@ -53,7 +54,7 @@ func (ws *Wallets) LoadFile() error {
 	}
 
 	var wallets Wallets
-	fileContent, err := os.ReadFile(walletFile)
+	fileContent, err := ioutil.ReadFile(walletFile)
 	if err != nil {
 		return err
 	}

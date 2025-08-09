@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	Difficulty = 15
+	Difficulty = 12
 )
 
 // define PoW
