@@ -16,6 +16,7 @@ func main() {
 	for _, block := range chain.Blocks {
 		fmt.Printf("Pre Hash: %x\n", block.PreHash)
 		fmt.Printf("Data: %s\n", block.Data)
+		fmt.Printf("Nonce: %d\n", block.Nonce)
 		fmt.Printf("Hash: %x\n", block.Hash)
 
 		pow := blockchain.NewProof(block)

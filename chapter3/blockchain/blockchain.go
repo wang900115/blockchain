@@ -55,7 +55,7 @@ func InitBlockChain() *BlockChain {
 
 func (chain *BlockChain) AddBlock(data string) {
 	var lastHash []byte
-
+	// 先從db找到最後的hash
 	err := chain.Database.View(func(txn *badger.Txn) error {
 		item, err := txn.Get([]byte("lh"))
 		item.Value(func(val []byte) error {

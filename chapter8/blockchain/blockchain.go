@@ -1,7 +1,10 @@
 package blockchain
 
 import (
+	"bytes"
+	"crypto/ecdsa"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -83,7 +86,7 @@ func InitBlockChain(address string) *BlockChain {
 
 }
 
-func (chain *BlockChain) AddBlock(transactions []*Transaction) {
+func (chain *BlockChain) AddBlock(transactions []*Transaction) *Block {
 	var lastHash []byte
 
 	err := chain.Database.View(func(txn *badger.Txn) error {
@@ -105,6 +108,8 @@ func (chain *BlockChain) AddBlock(transactions []*Transaction) {
 		return err
 	})
 	Handle(err)
+
+	return newBlock
 }
 
 func (chain *BlockChain) Iterator() *BlockChainIterator {
@@ -129,13 +134,10 @@ func (iter *BlockChainIterator) Next() *Block {
 	return block
 }
 
-/*
-找出所有還包含(未被該地址花費)Output的交易
-*/
-func (chain *BlockChain) FindUnspentTransactions(address string) []Transaction {
-	var unspentTxs []Transaction
+func (chain *BlockChain) FindUTXO() map[string]TxOutputs {
+	UTXO := make(map[string]TxOutputs)  // KEY 為 Transaction Id
+	spentTXOs := make(map[string][]int) // KEY 為 Transaction Id value 為 out index
 
-	spentTXOs := make(map[string][]int) // KEY: TransactionID VALUE: 輸出的INDEX (記錄「哪些交易的哪些 output index 已經被花掉」)
 	iter := chain.Iterator()
 
 	for {
@@ -143,10 +145,9 @@ func (chain *BlockChain) FindUnspentTransactions(address string) []Transaction {
 
 		for _, tx := range block.Transactions {
 			txID := hex.EncodeToString(tx.ID)
-			// 遍歷該交易的Outputs 檢查是否花掉
 		Outputs:
 			for outIdx, out := range tx.Outputs {
-				if spentTXOs[txID] != nil { // 代表該項交易還沒查看
+				if spentTXOs[txID] != nil {
 					for _, spentOut := range spentTXOs[txID] {
 						if spentOut == outIdx {
 							continue Outputs
@@ -154,18 +155,34 @@ func (chain *BlockChain) FindUnspentTransactions(address string) []Transaction {
 					}
 				}
 
-				if out.CanBeUnlocked(address) {
-					unspentTxs = append(unspentTxs, *tx)
-				}
+				outs := UTXO[txID]
+				outs.Outputs = append(outs.Outputs, out)
+				UTXO[txID] = outs
 			}
 
 			if !tx.IsCoinbase() {
 				for _, in := range tx.Inputs {
-					if in.CanUnlock(address) {
-						inTxID := hex.EncodeToString(in.ID)
-						spentTXOs[inTxID] = append(spentTXOs[inTxID], in.Out)
-					}
+					inTxID := hex.EncodeToString(in.ID)
+					spentTXOs[inTxID] = append(spentTXOs[inTxID], in.Out)
 				}
+			}
+		}
+		if len(block.PreHash) == 0 {
+			break
+		}
+	}
+	return UTXO
+}
+
+func (chain *BlockChain) FindTransaction(ID []byte) (Transaction, error) {
+	iter := chain.Iterator()
+
+	for {
+		block := iter.Next()
+
+		for _, tx := range block.Transactions {
+			if bytes.Compare(tx.ID, ID) == 0 {
+				return *tx, nil
 			}
 		}
 
@@ -173,48 +190,34 @@ func (chain *BlockChain) FindUnspentTransactions(address string) []Transaction {
 			break
 		}
 	}
-	return unspentTxs
+
+	return Transaction{}, errors.New("Transaction does not exist")
 }
 
-func (chain *BlockChain) FindUTXO(address string) []TxOutput {
-	var UTXOs []TxOutput
+func (chain *BlockChain) SignTransaction(tx *Transaction, priKey ecdsa.PrivateKey) {
+	preTXs := make(map[string]Transaction)
 
-	unspentTransactions := chain.FindUnspentTransactions(address)
-
-	for _, tx := range unspentTransactions {
-		for _, out := range tx.Outputs {
-			if out.CanBeUnlocked(address) {
-				UTXOs = append(UTXOs, out)
-			}
-		}
+	for _, in := range tx.Inputs {
+		prevTX, err := chain.FindTransaction(in.ID)
+		Handle(err)
+		preTXs[hex.EncodeToString(prevTX.ID)] = prevTX
 	}
 
-	return UTXOs
+	tx.Sign(priKey, preTXs)
 }
 
-/*
-從某個地址的UTXO中挑選足夠的輸出，來支付一筆交易
-*/
-func (chain *BlockChain) FindSpendableOutputs(address string, amount int) (int, map[string][]int) {
-	unspentOut := make(map[string][]int) // KEY: transactionID VALUE: 輸出的INDEX (紀錄哪些輸出被選中來付款)
-	unspentTxs := chain.FindUnspentTransactions(address)
-	accumulated := 0
+func (chain *BlockChain) VerifyTransaction(tx *Transaction) bool {
 
-Work:
-	for _, tx := range unspentTxs {
-		txID := hex.EncodeToString(tx.ID)
-
-		for outIdx, out := range tx.Outputs {
-			if out.CanBeUnlocked(address) && accumulated < amount {
-				accumulated += out.Value
-				unspentOut[txID] = append(unspentOut[txID], outIdx)
-
-				if accumulated > amount {
-					break Work
-				}
-			}
-		}
+	if tx.IsCoinbase() {
+		return true
 	}
 
-	return accumulated, unspentOut
+	prevTXs := make(map[string]Transaction)
+	for _, in := range tx.Inputs {
+		prevTX, err := chain.FindTransaction(in.ID)
+		Handle(err)
+		prevTXs[hex.EncodeToString(prevTX.ID)] = prevTX
+	}
+
+	return tx.Verify(prevTXs)
 }

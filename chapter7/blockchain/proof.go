@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	Difficulty = 24
+	Difficulty = 12
 )
 
 // define PoW
@@ -32,7 +32,7 @@ func (pow *ProofOfWork) InitData(nonce int) []byte {
 	return bytes.Join(
 		[][]byte{
 			pow.Block.PreHash,
-			pow.Block.Data,
+			pow.Block.HashTransactions(),
 			ToHex(int64(nonce)),
 			ToHex(int64(Difficulty)),
 		}, []byte{},
