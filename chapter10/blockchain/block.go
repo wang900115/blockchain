@@ -7,18 +7,18 @@ import (
 	"time"
 )
 
-// define block
 type Block struct {
-	Timestamp    int64
-	Hash         []byte
-	Transactions []*Transaction
-	PreHash      []byte
+	Timestamp    int64          // created time
+	Hash         []byte         // block's hash
+	Transactions []*Transaction // block's transactions
+	PreHash      []byte         // PreBlock's hash
 	Nonce        int
-	Height       int
+	Height       int // Block's Index (blockchain height)
 }
 
+// create transactionsHash for merklteTree base on block's transactions
 func (b *Block) HashTransactions() []byte {
-	var txHashes [][]byte
+	var txHashes [][]byte // key: transaction hash value: transaction serialized data
 
 	for _, tx := range b.Transactions {
 		txHashes = append(txHashes, tx.Serialize())
@@ -45,7 +45,7 @@ func Genesis(coinbase *Transaction) *Block {
 	return CreateBlock([]*Transaction{coinbase}, []byte{}, 0)
 }
 
-// serialize
+// serialize go's block struct to dataBytes
 func (b *Block) Serialize() []byte {
 	var res bytes.Buffer
 	encoder := gob.NewEncoder(&res)
@@ -55,7 +55,7 @@ func (b *Block) Serialize() []byte {
 	return res.Bytes()
 }
 
-// deserialize
+// deserialize dataBytes to go's block struct
 func Deserialize(data []byte) *Block {
 	var block Block
 

@@ -13,9 +13,10 @@ import (
 const walletFile = "./tmp/wallets_%s.data"
 
 type Wallets struct {
-	Wallets map[string]*Wallet
+	Wallets map[string]*Wallet // key: address value: wallet
 }
 
+// create node's wallets
 func CreateWallets(nodeId string) (*Wallets, error) {
 	wallets := Wallets{}
 	wallets.Wallets = make(map[string]*Wallet)
@@ -25,10 +26,12 @@ func CreateWallets(nodeId string) (*Wallets, error) {
 	return &wallets, err
 }
 
+// get address's wallet
 func (ws *Wallets) GetWallet(address string) Wallet {
 	return *ws.Wallets[address]
 }
 
+// get all wallet's address
 func (ws *Wallets) GetAllAddresses() []string {
 	var addresses []string
 
@@ -39,6 +42,7 @@ func (ws *Wallets) GetAllAddresses() []string {
 	return addresses
 }
 
+// create wallet
 func (ws *Wallets) AddWallet() string {
 	wallet := MakeWallet()
 	address := fmt.Sprintf("%s", wallet.Address())

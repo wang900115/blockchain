@@ -16,11 +16,16 @@ const (
 	version        = byte(0x00)
 )
 
+/*
+	privatekey -> publicKey ---version----checkSum------> address
+*/
+
 type Wallet struct {
 	PrivateKey ecdsa.PrivateKey
 	PublicKey  []byte
 }
 
+// create address
 func (w Wallet) Address() []byte {
 	pubHash := PublicKeyHash(w.PublicKey)
 
@@ -33,7 +38,7 @@ func (w Wallet) Address() []byte {
 	return address
 }
 
-func NewKeyPair() (ecdsa.PrivateKey, []byte) {
+func newKeyPair() (ecdsa.PrivateKey, []byte) {
 	curve := elliptic.P256()
 
 	private, err := ecdsa.GenerateKey(curve, rand.Reader)
@@ -45,8 +50,9 @@ func NewKeyPair() (ecdsa.PrivateKey, []byte) {
 	return *private, pub
 }
 
+// create wallet (privekey, publickey)
 func MakeWallet() *Wallet {
-	private, public := NewKeyPair()
+	private, public := newKeyPair()
 	wallet := Wallet{private, public}
 
 	return &wallet

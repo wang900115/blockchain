@@ -38,7 +38,7 @@ func retry(dir string, originalOpts badger.Options) (*badger.DB, error) {
 		return nil, fmt.Errorf(`removing "Lock": %s`, err)
 	}
 	retryOpts := originalOpts
-	retryOpts.Truncate = true
+	retryOpts.Truncate = true // truncate other connect process to badger database
 	db, err := badger.Open(retryOpts)
 	return db, err
 }
@@ -58,6 +58,7 @@ func openDB(dir string, opts badger.Options) (*badger.DB, error) {
 	}
 }
 
+// return this node's BlockChain (if exists)
 func ContinueBlockChain(nodeId string) *BlockChain {
 	path := fmt.Sprintf(dbPath, nodeId)
 	if !DBexists(path) {
@@ -84,6 +85,7 @@ func ContinueBlockChain(nodeId string) *BlockChain {
 	return &chain
 }
 
+// Init node's Blockchain (if not exists)
 func InitBlockChain(address, nodeId string) *BlockChain {
 	path := fmt.Sprintf(dbPath, nodeId)
 	if DBexists(path) {
@@ -118,6 +120,7 @@ func InitBlockChain(address, nodeId string) *BlockChain {
 
 func (chain *BlockChain) AddBlock(block *Block) {
 	err := chain.Database.Update(func(txn *badger.Txn) error {
+		// Check block is exists
 		if _, err := txn.Get(block.Hash); err != nil {
 			return nil
 		}
@@ -137,6 +140,7 @@ func (chain *BlockChain) AddBlock(block *Block) {
 
 		lastBlock := Deserialize(lastBlockData)
 
+		// Check this block is newest
 		if block.Height > lastBlock.Height {
 			err = txn.Set([]byte("lh"), block.Hash)
 			Handle(err)
@@ -210,6 +214,7 @@ func (chain *BlockChain) GetBestHeight() int {
 	return lastBlock.Height
 }
 
+// Mining Block (with verify transaction)
 func (chain *BlockChain) MineBlock(transactions []*Transaction) *Block {
 	var lastHash []byte
 	var lastHeight int
@@ -254,8 +259,8 @@ func (chain *BlockChain) MineBlock(transactions []*Transaction) *Block {
 }
 
 func (chain *BlockChain) FindUTXO() map[string]TxOutputs {
-	UTXO := make(map[string]TxOutputs)  // KEY 為 Transaction Id
-	spentTXOs := make(map[string][]int) // KEY 為 Transaction Id value 為 out index
+	UTXO := make(map[string]TxOutputs)  // key: transaction Id value: outputs
+	spentTXOs := make(map[string][]int) // key: transaction Id value: out_index
 
 	iter := chain.Iterator()
 
@@ -314,7 +319,7 @@ func (chain *BlockChain) FindTransaction(ID []byte) (Transaction, error) {
 }
 
 func (chain *BlockChain) SignTransaction(tx *Transaction, priKey ecdsa.PrivateKey) {
-	preTXs := make(map[string]Transaction)
+	preTXs := make(map[string]Transaction) // key: transactionId value: preTransaction
 
 	for _, in := range tx.Inputs {
 		prevTX, err := chain.FindTransaction(in.ID)

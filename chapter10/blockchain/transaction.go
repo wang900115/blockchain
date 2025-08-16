@@ -56,6 +56,7 @@ func DeserializeTransaction(data []byte) Transaction {
 	return transaction
 }
 
+// created transaction ID hash func
 func (tx *Transaction) Hash() []byte {
 	var hash [32]byte
 	txCopy := *tx
